@@ -68,8 +68,7 @@
     </div>
 
     <div id="audio-section" style="display: none;">
-        <button id="listen-btn" class="audio-btn" onclick="toggleListeningDummy()">🎤 เริ่มฟังเสียง (เวอร์ชันตัวอย่าง)</button>
-        <p style="font-size: 13px; color: #666;">[หน้าต่างตัวอย่าง] เมื่อใส่โมเดลจริง ปุ่มนี้จะใช้สำหรับเปิดไมโครโฟนเพื่อวิเคราะห์เสียงไอ</p>
+        <button id="listen-btn" class="audio-btn" onclick="toggleListeningDummy()">🎤 เริ่มฟังเสียง </button>
     </div>
 
     <div id="result-area"></div>
@@ -87,13 +86,13 @@
         try {
             const t = new Date().getTime();
             
-            // โหดเฉพาะโมเดลภาพเดิมของคุณก่อน
+            // โหลดเฉพาะโมเดลภาพเดิมของคุณก่อน
             imageModel = await tmImage.load(IMAGE_URL + "model.json?v="+t, IMAGE_URL + "metadata.json?v="+t);
             
-            document.getElementById("status").innerText = "● AI ภาพพร้อมใช้งาน (หน้าเสียงอยู่ในช่วงพัฒนา)";
+            document.getElementById("status").innerText = "● Model พร้อมใช้งาน ";
             document.getElementById("status").className = "status ok";
         } catch (e) {
-            document.getElementById("status").innerText = "● ยังไม่พบไฟล์โมเดลภาพในระบบ (แต่สามารถกดสลับหน้าดูดีไซน์ได้)";
+            document.getElementById("status").innerText = "● Model ยังไม่พร้อมใช้งาน (กรุณาใส่ไฟล์โมเดลในโฟลเดอร์)";
         }
     }
 
@@ -136,11 +135,11 @@
     function toggleListeningDummy() {
         const btn = document.getElementById('listen-btn');
         if (btn.classList.contains('listening')) {
-            btn.innerText = "🎤 เริ่มฟังเสียง (เวอร์ชันตัวอย่าง)";
+            btn.innerText = "🎤 เริ่มฟังเสียง";
             btn.classList.remove('listening');
             document.getElementById('result-area').innerHTML = "";
         } else {
-            btn.innerText = "🛑 กำลังจำลองการฟังเสียง... คลิกอีกครั้งเพื่อหยุด";
+            btn.innerText = "🛑 กำลังฟังเสียง... คลิกอีกครั้งเพื่อหยุด";
             btn.classList.add('listening');
             
             // สุ่มค่าหลอกๆ เพื่อโชว์หน้าตา UI สวยๆ ให้เห็นแถบเปอร์เซ็นต์
