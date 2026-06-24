@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chest X-Ray Analysis - Multi-Class</title>
+    <title>AI Chest Analysis - Preview Mode</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sonic@latest/dist/teachablemachine-sonic.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
@@ -13,6 +14,10 @@
         .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; box-sizing: border-box; }
         h2 { color: #1a73e8; margin-bottom: 20px; }
         
+        .nav-tabs { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e8f0fe; padding: 5px; border-radius: 12px; }
+        .tab-btn { background: none; border: none; padding: 10px 20px; font-family: 'Kanit', sans-serif; font-size: 15px; font-weight: 600; color: #1a73e8; cursor: pointer; border-radius: 8px; width: 50%; transition: 0.3s; }
+        .tab-btn.active { background: #1a73e8; color: white; }
+
         #status { padding: 12px; border-radius: 12px; font-weight: bold; margin-bottom: 20px; font-size: 14px; }
         .ok { background: #e6f4ea; color: #1e8e3e; border: 1px solid #34a853; }
         .err { background: #fce8e6; color: #d93025; border: 1px solid #ea4335; }
@@ -21,13 +26,18 @@
         .upload-zone:hover { background: #e8f0fe; }
         #image-preview { width: 100%; border-radius: 12px; margin-bottom: 25px; display: none; border: 1px solid #ddd; }
 
-        /* การจัดกลุ่มผลลัพธ์ */
+        /* ปุ่มอัดเสียง */
+        .audio-btn { background: #ea4335; color: white; border: none; padding: 15px 30px; font-family: 'Kanit', sans-serif; font-size: 16px; font-weight: bold; border-radius: 50px; cursor: pointer; width: 100%; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(234,67,53,0.3); transition: 0.3s; }
+        .audio-btn:hover { background: #d93025; }
+        .audio-btn.listening { background: #34a853; animation: pulse 1.5s infinite; box-shadow: 0 4px 15px rgba(52,168,83,0.3); }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
         .main-bar-container { margin-bottom: 15px; padding: 15px; border-radius: 12px; background: #fff; border: 1px solid #eee; text-align: left; }
         .bar-info { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; font-size: 16px; }
         .bar-outer { background: #eee; border-radius: 10px; height: 16px; width: 100%; overflow: hidden; }
-        .bar-inner { height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bar-inner { height: 100%; transition: width 0.3s ease; }
 
-        /* สไตล์หัวข้อย่อย */
         .sub-disease-list { margin-left: 20px; border-left: 3px solid #dee2e6; padding-left: 15px; margin-top: 15px; }
         .sub-item { margin-bottom: 12px; }
         .sub-info { display: flex; justify-content: space-between; font-size: 13px; color: #444; margin-bottom: 4px; }
@@ -39,16 +49,29 @@
 <body>
 
 <div class="card">
-    <h2>🔍 AI วิเคราะห์ปอด</h2>
-    <div id="status" class="status err">⏳ กำลังโหลดระบบ AI...</div>
-
-    <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="predict(event)">
-    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
-        <strong>📁 คลิกเพื่อเลือกรูปภาพ X-ray</strong>
-        <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">(คัดกรอง: Normal, Pneumonia, TB, Pneumothorax)</p>
+    <h2>🔍 AI วิเคราะห์โรคปอด</h2>
+    
+    <div class="nav-tabs">
+        <button id="tab-img" class="tab-btn active" onclick="switchPage('image')">📸 ตรวจจากภาพ</button>
+        <button id="tab-audio" class="tab-btn" onclick="switchPage('audio')">🎵 ตรวจจากเสียง</button>
     </div>
 
-    <img id="image-preview">
+    <div id="status" class="status err">⏳ กำลังโหลดระบบ AI...</div>
+
+    <div id="image-section">
+        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="predictImage(event)">
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+            <strong>📁 คลิกเพื่อเลือกรูปภาพ X-ray</strong>
+            <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">(คัดกรอง: Normal, Pneumonia, TB, Pneumothorax)</p>
+        </div>
+        <img id="image-preview">
+    </div>
+
+    <div id="audio-section" style="display: none;">
+        <button id="listen-btn" class="audio-btn" onclick="toggleListeningDummy()">🎤 เริ่มฟังเสียง (เวอร์ชันตัวอย่าง)</button>
+        <p style="font-size: 13px; color: #666;">[หน้าต่างตัวอย่าง] เมื่อใส่โมเดลจริง ปุ่มนี้จะใช้สำหรับเปิดไมโครโฟนเพื่อวิเคราะห์เสียงไอ</p>
+    </div>
+
     <div id="result-area"></div>
 
     <div class="disclaimer">
@@ -57,32 +80,79 @@
 </div>
 
 <script>
-    const URL = "./"; 
-    let model;
+    const IMAGE_URL = "./"; 
+    let imageModel;
 
     async function init() {
         try {
             const t = new Date().getTime();
-            model = await tmImage.load(URL + "model.json?v="+t, URL + "metadata.json?v="+t);
-            document.getElementById("status").innerText = "● AI พร้อมประมวลผลแยกโรค";
+            
+            // โหดเฉพาะโมเดลภาพเดิมของคุณก่อน
+            imageModel = await tmImage.load(IMAGE_URL + "model.json?v="+t, IMAGE_URL + "metadata.json?v="+t);
+            
+            document.getElementById("status").innerText = "● AI ภาพพร้อมใช้งาน (หน้าเสียงอยู่ในช่วงพัฒนา)";
             document.getElementById("status").className = "status ok";
         } catch (e) {
-            document.getElementById("status").innerText = "● ไม่พบไฟล์โมเดลในระบบ";
+            document.getElementById("status").innerText = "● ยังไม่พบไฟล์โมเดลภาพในระบบ (แต่สามารถกดสลับหน้าดูดีไซน์ได้)";
         }
     }
 
-    async function predict(event) {
+    // ฟังก์ชันสลับหน้าจอ (กดดูหน้าเสียงเปล่าๆ ได้เลย ไม่ติด Error)
+    function switchPage(page) {
+        document.getElementById('result-area').innerHTML = ""; 
+        
+        if (page === 'image') {
+            document.getElementById('tab-img').classList.add('active');
+            document.getElementById('tab-audio').classList.remove('active');
+            document.getElementById('image-section').style.display = 'block';
+            document.getElementById('audio-section').style.display = 'none';
+        } else {
+            document.getElementById('tab-img').classList.remove('active');
+            document.getElementById('tab-audio').classList.add('active');
+            document.getElementById('image-section').style.display = 'none';
+            document.getElementById('audio-section').style.display = 'block';
+            document.getElementById('image-preview').style.display = 'none';
+        }
+    }
+
+    // ฟังก์ชันทำนายภาพเดิม
+    async function predictImage(event) {
+        if(!imageModel) {
+            alert("กรุณาใส่ไฟล์โมเดลภาพในโฟลเดอร์ก่อนครับ");
+            return;
+        }
         const file = event.target.files[0];
         if (!file) return;
         const img = document.getElementById("image-preview");
         img.src = window.URL.createObjectURL(file);
         img.style.display = "block";
         img.onload = async () => {
-            const prediction = await model.predict(img);
+            const prediction = await imageModel.predict(img);
             renderResults(prediction);
         };
     }
 
+    // ฟังก์ชันปุ่มกดเล่นหน้าเสียง (แบบจำลอง เพื่อให้อาจารย์เห็นภาพสไตล์แถบสถานะ)
+    function toggleListeningDummy() {
+        const btn = document.getElementById('listen-btn');
+        if (btn.classList.contains('listening')) {
+            btn.innerText = "🎤 เริ่มฟังเสียง (เวอร์ชันตัวอย่าง)";
+            btn.classList.remove('listening');
+            document.getElementById('result-area').innerHTML = "";
+        } else {
+            btn.innerText = "🛑 กำลังจำลองการฟังเสียง... คลิกอีกครั้งเพื่อหยุด";
+            btn.classList.add('listening');
+            
+            // สุ่มค่าหลอกๆ เพื่อโชว์หน้าตา UI สวยๆ ให้เห็นแถบเปอร์เซ็นต์
+            const dummyResults = [
+                { className: "Normal (ปกติ)", probability: 0.85 },
+                { className: "Coughing (เสียงไอผิดปกติ)", probability: 0.15 }
+            ];
+            renderResults(dummyResults);
+        }
+    }
+
+    // ฟังก์ชันแสดงผลแถบเปอร์เซ็นต์
     function renderResults(results) {
         const area = document.getElementById("result-area");
         area.innerHTML = "";
@@ -91,9 +161,8 @@
         let diseases = [];
         let totalAbnormal = 0;
 
-        // จัดกลุ่มข้อมูล
         results.forEach(res => {
-            if (res.className.toLowerCase().includes("normal")) {
+            if (res.className.toLowerCase().includes("normal") || res.className.toLowerCase().includes("background")) {
                 normalScore = res.probability;
             } else {
                 diseases.push(res);
@@ -101,40 +170,38 @@
             }
         });
 
-        // 1. แสดงแถบผลตรวจปกติ
         const nPct = (normalScore * 100).toFixed(2);
         area.innerHTML += `
             <div class="main-bar-container">
-                <div class="bar-info"><span>✅ ผลตรวจปกติ (Normal)</span><span>${nPct}%</span></div>
+                <div class="bar-info"><span>✅ ผลตรวจปกติ / ปลอดภัย</span><span>${nPct}%</span></div>
                 <div class="bar-outer"><div class="bar-inner" style="width: ${nPct}%; background: #28a745;"></div></div>
             </div>
         `;
 
-        // 2. แสดงแถบแม่ "ความเสี่ยงผิดปกติ" และลิสต์โรคย่อย
-        const abPct = (totalAbnormal * 100).toFixed(2);
-        let abHtml = `
-            <div class="main-bar-container" style="border-color: #f5c6cb;">
-                <div class="bar-info" style="color: #d93025;"><span>❌ พบความเสี่ยง (Abnormal)</span><span>${abPct}%</span></div>
-                <div class="bar-outer"><div class="bar-inner" style="width: ${abPct}%; background: #d93025;"></div></div>
-                <div class="sub-disease-list">
-                    <p style="font-size: 13px; font-weight: bold; color: #666; margin: 0 0 10px 0;">รายละเอียดรายโรค:</p>
-        `;
-
-        // เรียงโรคที่เปอร์เซ็นต์สูงสุดขึ้นก่อน
-        diseases.sort((a, b) => b.probability - a.probability);
-
-        diseases.forEach(d => {
-            const dPct = (d.probability * 100).toFixed(2);
-            abHtml += `
-                <div class="sub-item">
-                    <div class="sub-info"><span>• คล้าย ${d.className}</span><span>${dPct}%</span></div>
-                    <div class="sub-bar-outer"><div style="width:${dPct}%; background:#6c757d; height:100%;"></div></div>
-                </div>
+        if(diseases.length > 0) {
+            const abPct = (totalAbnormal * 100).toFixed(2);
+            let abHtml = `
+                <div class="main-bar-container" style="border-color: #f5c6cb;">
+                    <div class="bar-info" style="color: #d93025;"><span>❌ พบความเสี่ยงผิดปกติ</span><span>${abPct}%</span></div>
+                    <div class="bar-outer"><div class="bar-inner" style="width: ${abPct}%; background: #d93025;"></div></div>
+                    <div class="sub-disease-list">
+                        <p style="font-size: 13px; font-weight: bold; color: #666; margin: 0 0 10px 0;">รายละเอียดจำแนกโรค:</p>
             `;
-        });
 
-        abHtml += `</div></div>`;
-        area.innerHTML += abHtml;
+            diseases.sort((a, b) => b.probability - a.probability);
+            diseases.forEach(d => {
+                const dPct = (d.probability * 100).toFixed(2);
+                abHtml += `
+                    <div class="sub-item">
+                        <div class="sub-info"><span>• ${d.className}</span><span>${dPct}%</span></div>
+                        <div class="sub-bar-outer"><div style="width:${dPct}%; background:#6c757d; height:100%;"></div></div>
+                    </div>
+                `;
+            });
+
+            abHtml += `</div></div>`;
+            area.innerHTML += abHtml;
+        }
     }
 
     init();
