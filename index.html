@@ -62,7 +62,9 @@
         <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="predictImage(event)">
         <div class="upload-zone" onclick="document.getElementById('file-input').click()">
             <strong>📁 คลิกเพื่อเลือกรูปภาพ X-ray</strong>
-            <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">(คัดกรอง: Normal, Pneumonia, TB, Pneumothorax)</p>
+            <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
+    (คัดกรอง: ปกติ, วัณโรค, ปอดบวม, ลมในช่องอก, ถุงลมโป่งพอง, พังผืดในปอด, Covid-19)
+</p>
         </div>
         <img id="image-preview">
     </div>
@@ -152,23 +154,47 @@
     }
 
     // ฟังก์ชันแสดงผลแถบเปอร์เซ็นต์
-    function renderResults(results) {
+ function renderResults(results) {
         const area = document.getElementById("result-area");
         area.innerHTML = "";
 
         let normalScore = 0;
+        let nonLungScore = 0;
         let diseases = [];
         let totalAbnormal = 0;
 
         results.forEach(res => {
-            if (res.className.toLowerCase().includes("normal") || res.className.toLowerCase().includes("background")) {
+            const classNameLower = res.className.toLowerCase();
+            
+            // ตรวจสอบชื่อคลาสว่าเป็น "ไม่ใช่ปอด" หรือไม่
+            if (classNameLower.includes("non-lung") || classNameLower.includes("ไม่ใช่ปอด")) {
+                nonLungScore = res.probability;
+            } 
+            // ตรวจสอบชื่อคลาสว่าเป็น "ปกติ" หรือไม่
+            else if (classNameLower.includes("normal") || classNameLower.includes("ปกติ")) {
                 normalScore = res.probability;
-            } else {
+            } 
+            // คลาสโรคอื่นๆ ทั้งหมด (วัณโรค, ปอดบวม, ลมในช่องอก, ถุงลมโป่งพอง, พังผืด, Covid)
+            else {
                 diseases.push(res);
                 totalAbnormal += res.probability;
             }
         });
 
+        // ถ้า AI มั่นใจว่าเป็นภาพอื่นที่ไม่ใช่ปอด (มากกว่า 50%) ให้ขึ้นเตือนแถบสีเหลือง
+        if (nonLungScore > 0.5) {
+            const nlPct = (nonLungScore * 100).toFixed(2);
+            area.innerHTML += `
+                <div class="main-bar-container" style="border-color: #ffeeba; background: #fff3cd;">
+                    <div class="bar-info" style="color: #856404;"><span>⚠️ ตรวจพบ: ภาพนี้ไม่ใช่ภาพเอกซเรย์ปอด</span><span>${nlPct}%</span></div>
+                    <div class="bar-outer"><div class="bar-inner" style="width: ${nlPct}%; background: #ffc107;"></div></div>
+                    <p style="font-size: 13px; color: #856404; margin: 10px 0 0 0;">* กรุณาอัปโหลดรูปภาพทรวงอก (Chest X-ray) ที่ถูกต้อง</p>
+                </div>
+            `;
+            return; 
+        }
+
+        // แสดงผลฝั่งปกติ
         const nPct = (normalScore * 100).toFixed(2);
         area.innerHTML += `
             <div class="main-bar-container">
@@ -177,6 +203,7 @@
             </div>
         `;
 
+        // แสดงผลฝั่งพบความเสี่ยงโรค
         if(diseases.length > 0) {
             const abPct = (totalAbnormal * 100).toFixed(2);
             let abHtml = `
@@ -202,7 +229,6 @@
             area.innerHTML += abHtml;
         }
     }
-
     init();
 </script>
 </body>
